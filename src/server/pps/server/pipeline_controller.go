@@ -102,6 +102,7 @@ func (a *apiServer) step(pachClient *client.APIClient, pipeline string, keyVer, 
 	// Bring 'pipeline' into the correct state by taking appropriate action
 	switch op.ptr.State {
 	case pps.PipelineState_PIPELINE_STARTING, pps.PipelineState_PIPELINE_RESTARTING:
+		op.stopCrashingPipelineMonitor()
 		if op.rc != nil && !op.rcIsFresh() {
 			// old RC is not down yet
 			return op.restartPipeline("stale RC") // step() will be called again after etcd write
@@ -117,6 +118,7 @@ func (a *apiServer) step(pachClient *client.APIClient, pipeline string, keyVer, 
 		// trigger another event
 		return op.setPipelineState(pps.PipelineState_PIPELINE_RUNNING, "")
 	case pps.PipelineState_PIPELINE_RUNNING:
+		op.stopCrashingPipelineMonitor()
 		if !op.rcIsFresh() {
 			return op.restartPipeline("stale RC") // step() will be called again after etcd write
 		}
@@ -129,6 +131,7 @@ func (a *apiServer) step(pachClient *client.APIClient, pipeline string, keyVer, 
 		// Note: mostly this should do nothing, as this runs several times per job
 		return op.scaleUpPipeline()
 	case pps.PipelineState_PIPELINE_STANDBY:
+		op.stopCrashingPipelineMonitor()
 		if !op.rcIsFresh() {
 			return op.restartPipeline("stale RC") // step() will be called again after etcd write
 		}
@@ -139,6 +142,7 @@ func (a *apiServer) step(pachClient *client.APIClient, pipeline string, keyVer, 
 		op.startPipelineMonitor()
 		return op.scaleDownPipeline()
 	case pps.PipelineState_PIPELINE_PAUSED:
+		op.stopCrashingPipelineMonitor()
 		if !op.rcIsFresh() {
 			return op.restartPipeline("stale RC") // step() will be called again after etcd write
 		}
@@ -157,6 +161,7 @@ func (a *apiServer) step(pachClient *client.APIClient, pipeline string, keyVer, 
 		// default: scale down if pause/standby hasn't propagated to etcd yet
 		return op.scaleDownPipeline()
 	case pps.PipelineState_PIPELINE_FAILURE:
+		op.stopCrashingPipelineMonitor()
 		// pipeline fails if it encounters an unrecoverable error
 		if err := op.finishPipelineOutputCommits(); err != nil {
 			return err
@@ -419,7 +424,6 @@ func (op *pipelineOp) startPipelineMonitor() {
 }
 
 func (op *pipelineOp) startCrashingPipelineMonitor() {
-	op.stopPipelineMonitor()
 	op.apiServer.monitorCancelsMu.Lock()
 	defer op.apiServer.monitorCancelsMu.Unlock()
 	if _, ok := op.apiServer.crashingMonitorCancels[op.name]; !ok {

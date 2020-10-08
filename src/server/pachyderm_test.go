@@ -5463,6 +5463,7 @@ func TestGroupInput(t *testing.T) {
 		"",
 		[]string{"bash"},
 		[]string{
+			fmt.Sprintf("find /pfs"),
 			fmt.Sprintf("touch /pfs/out/$(echo $(ls -r /pfs/%s/)$(ls -r /pfs/%s/))", repos[0], repos[1]),
 		},
 		&pps.ParallelismSpec{

@@ -59,15 +59,13 @@ func (d *driver) moveData(inputs []*common.Input, dir string) error {
 		if input.S3 {
 			continue
 		}
-		for _, file := range input.FileInfo {
-			if file.File.Path == "" {
-				return errors.New("input does not have a name")
-			}
-			src := filepath.Join(dir, file.File.Path)
-			dst := filepath.Join(d.InputDir(), file.File.Path)
-			if err := os.Rename(src, dst); err != nil {
-				return err
-			}
+		if input.FileInfo.File.Path == "" {
+			return errors.New("input does not have a name")
+		}
+		src := filepath.Join(dir, input.FileInfo.File.Path)
+		dst := filepath.Join(d.InputDir(), input.FileInfo.File.Path)
+		if err := os.Rename(src, dst); err != nil {
+			return err
 		}
 	}
 
